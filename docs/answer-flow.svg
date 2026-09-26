@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="460" viewBox="0 0 1280 460" role="img" aria-labelledby="flow-title">
+  <title id="flow-title">Answer flow</title>
+  <defs>
+    <marker id="flow-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#1c1c1c"/>
+    </marker>
+    <marker id="flow-red" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#9b1c1c"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", sans-serif; fill: #1c1c1c; }
+      .title { font-size: 22px; font-weight: 700; }
+      .head { font-size: 16px; font-weight: 700; }
+      .sub { font-size: 13px; }
+      .label { font-size: 13px; font-weight: 600; }
+    </style>
+  </defs>
+  <rect width="1280" height="460" fill="#ffffff"/>
+  <text class="title" x="40" y="44">One answer</text>
+
+  <rect x="40" y="100" width="170" height="90" rx="12" fill="#e8f1fb" stroke="#1d4e89" stroke-width="2"/>
+  <text class="head" x="125" y="140" text-anchor="middle" fill="#1d4e89">Vue page</text>
+  <text class="sub" x="125" y="166" text-anchor="middle">choice clicked</text>
+
+  <rect x="280" y="100" width="170" height="90" rx="12" fill="#fff7e8" stroke="#8a5a00" stroke-width="2"/>
+  <text class="head" x="365" y="140" text-anchor="middle" fill="#8a5a00">ws.py</text>
+  <text class="sub" x="365" y="166" text-anchor="middle">submit_answer</text>
+
+  <rect x="520" y="100" width="190" height="90" rx="12" fill="#e5f6ea" stroke="#0f7b3a" stroke-width="2"/>
+  <text class="head" x="615" y="140" text-anchor="middle" fill="#0f7b3a">QuizService</text>
+  <text class="sub" x="615" y="166" text-anchor="middle">first answer wins</text>
+
+  <rect x="790" y="80" width="160" height="70" rx="12" fill="#e5f6ea" stroke="#0f7b3a" stroke-width="2"/>
+  <text class="head" x="870" y="122" text-anchor="middle" fill="#0f7b3a">+1 or 0</text>
+
+  <rect x="1030" y="80" width="200" height="70" rx="12" fill="#f3f0ff" stroke="#4c3d8f" stroke-width="2"/>
+  <text class="head" x="1130" y="110" text-anchor="middle" fill="#4c3d8f">This quiz</text>
+  <text class="sub" x="1130" y="132" text-anchor="middle">leaderboard</text>
+
+  <rect x="790" y="280" width="160" height="80" rx="12" fill="#fdecec" stroke="#9b1c1c" stroke-width="2"/>
+  <text class="head" x="870" y="314" text-anchor="middle" fill="#9b1c1c">Repeat</text>
+  <text class="sub" x="870" y="338" text-anchor="middle">sender only</text>
+
+  <rect x="1030" y="280" width="200" height="80" rx="12" fill="#f4f4f4" stroke="#6b6b6b" stroke-width="2"/>
+  <text class="head" x="1130" y="314" text-anchor="middle" fill="#6b6b6b">Other quiz</text>
+  <text class="sub" x="1130" y="338" text-anchor="middle">no message</text>
+
+  <path d="M210 145 H280" fill="none" stroke="#1c1c1c" stroke-width="2" marker-end="url(#flow-arrow)"/>
+  <path d="M450 145 H520" fill="none" stroke="#1c1c1c" stroke-width="2" marker-end="url(#flow-arrow)"/>
+  <path d="M710 125 H790" fill="none" stroke="#1c1c1c" stroke-width="2" marker-end="url(#flow-arrow)"/>
+  <text class="label" x="750" y="112" text-anchor="middle">new</text>
+  <path d="M950 115 H1030" fill="none" stroke="#1c1c1c" stroke-width="2" marker-end="url(#flow-arrow)"/>
+
+  <path d="M615 190 V320 H790" fill="none" stroke="#9b1c1c" stroke-width="2" marker-end="url(#flow-red)"/>
+  <text class="label" x="690" y="308" text-anchor="middle" fill="#9b1c1c">already answered</text>
+
+  <path d="M1130 150 V250" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5"/>
+  <path d="M1118 238 L1130 250 L1142 238" fill="none" stroke="#9b1c1c" stroke-width="2.5"/>
+  <path d="M1118 262 L1142 238" fill="none" stroke="#9b1c1c" stroke-width="2.5"/>
+</svg>

@@ -83,18 +83,66 @@ Candidates are required to submit the following:
       - **Demo**: Show your code/tests in action.
       - **Conclusion**: Learnings, challenges, future ideas.
 
-## Run the tests
+## Solution
 
-Backend, from `backend`:
+People create a quiz, share its ID, and join with a display name. Each person answers five vocabulary questions. The first answer is final. A correct answer adds 1 point. Everyone in that quiz sees the leaderboard update over a WebSocket. Another quiz does not.
+
+A picture of the pieces and the live answer flow is in [docs/how-it-works.md](docs/how-it-works.md). The design, including what is built and what is only planned, is in [docs/system-design.md](docs/system-design.md). How Cursor was used, reviewed, and checked is in [docs/ai-collaboration.md](docs/ai-collaboration.md).
+
+### Architecture
+
+One Vue 3 app talks to one FastAPI process. REST creates the quiz and the participant. The WebSocket carries questions, answers, and the leaderboard. `QuizService` owns scoring and leaderboard order. Sessions and socket rooms are in memory. Redis, a database, and authentication are not implemented.
+
+### Stack
+
+- Python, FastAPI, Uvicorn, and the `websockets` library
+- Vue 3, TypeScript, and Vite
+- pytest for the API, Vitest and Vue Test Utils for the page
+
+### Run the app
+
+Use two terminals. Start the API first.
+
+From `backend`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+From `frontend`:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open http://127.0.0.1:5173. The dev server proxies `/quizzes` and `/ws` to the API. `GET http://127.0.0.1:8000/health` returns `{"status":"ok"}`.
+
+### Run the tests
+
+From `backend`:
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python -m pytest
 ```
 
-Frontend, from `frontend`:
+From `frontend`:
 
 ```powershell
 npm install
 npm test
 ```
+
+### Demo
+
+1. Start the API and the Vue app.
+2. In the first window, choose **Create quiz**, enter a name, and choose **Join quiz**.
+3. Copy the quiz ID into a second window, enter a different name, and join.
+4. In the first window, answer the first question. Both leaderboards update. A correct answer shows score 1 for that person only.
+5. Refresh the first window. The same person, score, and question come back.
+6. Choose **Leave quiz** to return to the join form.
+
+A second quiz ID does not show the first quiz's participants. Restarting the API clears in-memory sessions. The page then asks the person to join again.
