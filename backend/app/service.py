@@ -35,6 +35,14 @@ class QuizService:
             session.participants[participant.user_id] = participant
         return participant
 
+    def get_participant(self, quiz_id: str, user_id: str) -> Participant:
+        with self._store.locked() as sessions:
+            session = self._require_session(sessions, quiz_id)
+            participant = session.participants.get(user_id)
+            if participant is None:
+                raise ParticipantNotFound(user_id)
+            return participant
+
     def list_questions(self, quiz_id: str) -> list[Question]:
         with self._store.locked() as sessions:
             session = self._require_session(sessions, quiz_id)

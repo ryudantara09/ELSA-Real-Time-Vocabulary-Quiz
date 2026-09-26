@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -54,3 +56,16 @@ class LeaderboardEntryResponse(BaseModel):
     user_id: str
     display_name: str
     score: int
+
+
+class SubmitAnswerMessage(BaseModel):
+    type: Literal["submit_answer"]
+    question_id: str
+    choice: str
+
+    @field_validator("question_id", "choice")
+    @classmethod
+    def require_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
