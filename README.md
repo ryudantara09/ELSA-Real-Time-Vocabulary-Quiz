@@ -82,3 +82,19 @@ Candidates are required to submit the following:
          - **Most importantly**, walk us through your process for ensuring the quality, correctness, and security of AI-assisted output. How did you test and verify? (This part is critical!)
       - **Demo**: Show your code/tests in action.
       - **Conclusion**: Learnings, challenges, future ideas.
+
+## Run the tests
+
+Backend, from `backend`:
+
+```powershell
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m pytest
+```
+
+Frontend, from `frontend`:
+
+```powershell
+npm install
+npm test
+```
