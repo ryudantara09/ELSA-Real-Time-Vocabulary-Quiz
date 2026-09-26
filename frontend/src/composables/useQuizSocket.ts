@@ -1,14 +1,24 @@
 import { computed, onUnmounted, ref } from "vue";
-import type {
-  ConnectionStatus,
-  ErrorMessage,
-  LeaderboardEntry,
-  ParticipantResponse,
-  Question,
-  ServerMessage,
+import {
+  parseServerMessage,
+  type ConnectionStatus,
+  type ErrorMessage,
+  type LeaderboardEntry,
+  type ParticipantResponse,
+  type Question,
 } from "../types/quiz";
 
 const HIGHLIGHT_MS = 1200;
+const SESSION_KEY = "vocabulary-quiz-session";
+const EXPIRED_QUIZ_MESSAGE = "This quiz is no longer available. Join again.";
+const UNEXPECTED_MESSAGE = "Received an unexpected update";
+
+interface SavedSession {
+  quizId: string;
+  userId: string;
+  displayName: string;
+  questionIndex: number;
+}
 
 export function useQuizSocket() {
   const status = ref<ConnectionStatus>("idle");
@@ -77,6 +87,7 @@ export function useQuizSocket() {
       userId.value = participant.user_id;
       displayName.value = participant.display_name;
       score.value = participant.score;
+      writeSession();
       openSocket();
     } catch {
       status.value = "error";
@@ -94,6 +105,14 @@ export function useQuizSocket() {
     }
     errorMessage.value = "";
     openSocket();
+  }
+
+  function leave(): void {
+    closeSocket();
+    clearSavedSession();
+    resetQuizState();
+    status.value = "idle";
+    errorMessage.value = "";
   }
 
   function submitAnswer(questionId: string, choice: string): void {
@@ -120,6 +139,7 @@ export function useQuizSocket() {
     if (questionIndex.value > 0) {
       questionIndex.value -= 1;
       clearFeedback();
+      writeSession();
     }
   }
 
@@ -127,11 +147,13 @@ export function useQuizSocket() {
     if (questionIndex.value < questions.value.length - 1) {
       questionIndex.value += 1;
       clearFeedback();
+      writeSession();
     }
   }
 
   function openSocket(): void {
     closeSocket();
+    submitting.value = false;
     status.value = "connecting";
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const url = `${protocol}://${window.location.host}/ws/quizzes/${encodeURIComponent(quizId.value)}/participants/${encodeURIComponent(userId.value)}`;
@@ -142,14 +164,14 @@ export function useQuizSocket() {
       if (socket !== next) {
         return;
       }
-      let message: ServerMessage;
+      let payload: unknown;
       try {
-        message = JSON.parse(event.data) as ServerMessage;
+        payload = JSON.parse(event.data) as unknown;
       } catch {
-        errorMessage.value = "Received an unreadable message";
+        noteUnexpectedMessage();
         return;
       }
-      handleMessage(message);
+      handleMessage(payload);
     };
 
     next.onerror = () => {
@@ -178,12 +200,26 @@ export function useQuizSocket() {
     };
   }
 
-  function handleMessage(message: ServerMessage): void {
+  function handleMessage(payload: unknown): void {
+    const message = parseServerMessage(payload);
+    if (!message) {
+      noteUnexpectedMessage();
+      return;
+    }
     if (message.type === "connected") {
       status.value = "connected";
       errorMessage.value = "";
+      const hadQuestions = questions.value.length > 0;
+      const sameQuestions =
+        hadQuestions &&
+        message.questions.length === questions.value.length &&
+        message.questions.every(
+          (question, index) => question.question_id === questions.value[index]?.question_id,
+        );
       questions.value = message.questions;
-      questionIndex.value = 0;
+      if (questionIndex.value >= message.questions.length || (hadQuestions && !sameQuestions)) {
+        questionIndex.value = 0;
+      }
       displayName.value = message.display_name;
       applyLeaderboard(message.leaderboard);
       return;
@@ -207,6 +243,10 @@ export function useQuizSocket() {
 
   function applyError(message: ErrorMessage): void {
     submitting.value = false;
+    if (message.code === "quiz_not_found" || message.code === "participant_not_found") {
+      expireSession();
+      return;
+    }
     if (message.code === "already_answered" && message.question_id) {
       markAnswered(message.question_id);
       if (typeof message.score === "number") {
@@ -260,7 +300,109 @@ export function useQuizSocket() {
     feedbackCorrect.value = null;
   }
 
+  function expireSession(): void {
+    closeSocket();
+    clearSavedSession();
+    resetQuizState();
+    status.value = "error";
+    errorMessage.value = EXPIRED_QUIZ_MESSAGE;
+  }
+
+  function noteUnexpectedMessage(): void {
+    if (status.value === "connected") {
+      feedbackCorrect.value = null;
+      feedback.value = UNEXPECTED_MESSAGE;
+      return;
+    }
+    errorMessage.value = UNEXPECTED_MESSAGE;
+  }
+
+  function resetQuizState(): void {
+    quizId.value = "";
+    userId.value = "";
+    displayName.value = "";
+    questions.value = [];
+    questionIndex.value = 0;
+    leaderboard.value = [];
+    score.value = 0;
+    answered.value = {};
+    submitting.value = false;
+    joining.value = false;
+    highlightedUserIds.value = [];
+    clearFeedback();
+  }
+
+  function writeSession(): void {
+    const saved: SavedSession = {
+      quizId: quizId.value,
+      userId: userId.value,
+      displayName: displayName.value,
+      questionIndex: questionIndex.value,
+    };
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(saved));
+    } catch {
+      // The tab still works when storage is blocked.
+    }
+  }
+
+  function clearSavedSession(): void {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      return;
+    }
+  }
+
+  function readSession(): SavedSession | null {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      const session = parsed as Record<string, unknown>;
+      if (
+        typeof session.quizId !== "string" ||
+        typeof session.userId !== "string" ||
+        typeof session.displayName !== "string" ||
+        !session.quizId ||
+        !session.userId
+      ) {
+        return null;
+      }
+      const questionIndex =
+        typeof session.questionIndex === "number" && session.questionIndex >= 0
+          ? session.questionIndex
+          : 0;
+      return {
+        quizId: session.quizId,
+        userId: session.userId,
+        displayName: session.displayName,
+        questionIndex,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function restoreSession(): void {
+    const saved = readSession();
+    if (!saved) {
+      return;
+    }
+    quizId.value = saved.quizId;
+    userId.value = saved.userId;
+    displayName.value = saved.displayName;
+    questionIndex.value = saved.questionIndex;
+    openSocket();
+  }
+
   function closeSocket(): void {
+    submitting.value = false;
     if (!socket) {
       return;
     }
@@ -276,6 +418,8 @@ export function useQuizSocket() {
       current.close();
     }
   }
+
+  restoreSession();
 
   onUnmounted(() => {
     closeSocket();
@@ -301,6 +445,7 @@ export function useQuizSocket() {
     joining,
     join,
     reconnect,
+    leave,
     submitAnswer,
     showPrevious,
     showNext,

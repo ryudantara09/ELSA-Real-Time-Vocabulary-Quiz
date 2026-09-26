@@ -9,6 +9,7 @@ defineProps<{
 
 const emit = defineEmits<{
   reconnect: [];
+  leave: [];
 }>();
 
 const labels: Record<ConnectionStatus, string> = {
@@ -27,13 +28,16 @@ const labels: Record<ConnectionStatus, string> = {
       <span v-if="quizId">Quiz {{ quizId }}</span>
     </p>
     <p v-if="message" class="message">{{ message }}</p>
-    <button
-      v-if="status === 'disconnected' || status === 'error'"
-      type="button"
-      @click="emit('reconnect')"
-    >
-      Reconnect
-    </button>
+    <div class="actions">
+      <button
+        v-if="status === 'disconnected' || status === 'error'"
+        type="button"
+        @click="emit('reconnect')"
+      >
+        Reconnect
+      </button>
+      <button type="button" @click="emit('leave')">Leave quiz</button>
+    </div>
   </div>
 </template>
 
@@ -72,6 +76,11 @@ span:first-child {
 
 .message {
   color: #9b1c1c;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 button {

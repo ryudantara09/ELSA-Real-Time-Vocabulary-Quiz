@@ -1,4 +1,4 @@
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.domain import (
@@ -53,12 +53,24 @@ def list_questions(quiz_id: str) -> list[QuestionResponse]:
 
 @router.post("/{quiz_id}/answers", response_model=SubmitAnswerResponse)
 def submit_answer(quiz_id: str, body: SubmitAnswerRequest) -> SubmitAnswerResponse:
-    result = quiz_service.submit_answer(
-        quiz_id,
-        body.user_id,
-        body.question_id,
-        body.choice,
-    )
+    try:
+        result = quiz_service.submit_answer(
+            quiz_id,
+            body.user_id,
+            body.question_id,
+            body.choice,
+        )
+    except AnswerAlreadySubmitted as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "This question was already answered",
+                "question_id": body.question_id,
+                "correct": exc.correct,
+                "score": exc.score,
+                "already_answered": True,
+            },
+        ) from exc
     return SubmitAnswerResponse(correct=result.correct, score=result.score)
 
 

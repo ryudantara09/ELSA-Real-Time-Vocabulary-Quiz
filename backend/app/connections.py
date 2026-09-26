@@ -1,6 +1,9 @@
 import asyncio
+import logging
 
 from fastapi import WebSocket
+
+logger = logging.getLogger("app.connections")
 
 
 class ConnectionManager:
@@ -42,8 +45,14 @@ class ConnectionManager:
         for user_id, websocket in targets:
             try:
                 await websocket.send_json(message)
-            except Exception:
+            except Exception as exc:
                 # One closed client must not stop the rest of the room.
+                logger.warning(
+                    "dropped websocket quiz=%s user=%s error=%s",
+                    quiz_id,
+                    user_id,
+                    exc.__class__.__name__,
+                )
                 await self.disconnect(quiz_id, user_id, websocket)
 
 

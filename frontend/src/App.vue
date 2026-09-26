@@ -29,6 +29,7 @@ const canSubmit = computed(() => quiz.status.value === "connected");
         :quiz-id="quiz.quizId.value"
         :message="quiz.errorMessage.value"
         @reconnect="quiz.reconnect"
+        @leave="quiz.leave"
       />
       <div class="columns">
         <QuizQuestion

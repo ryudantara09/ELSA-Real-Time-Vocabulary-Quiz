@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -17,7 +18,15 @@ from app.domain import (
 from app.schemas import SubmitAnswerMessage
 from app.service import quiz_service
 
+logger = logging.getLogger("app.ws")
+
 router = APIRouter()
+
+_SERVER_ERROR = {
+    "type": "error",
+    "code": "server_error",
+    "message": "Something went wrong. You can try again.",
+}
 
 _INVALID_MESSAGE = {
     "type": "error",
@@ -33,12 +42,20 @@ async def quiz_socket(websocket: WebSocket, quiz_id: str, user_id: str) -> None:
         participant = quiz_service.get_participant(quiz_id, user_id)
         questions = quiz_service.list_questions(quiz_id)
     except QuizError as exc:
-        await websocket.send_json(_error_payload(exc))
-        await websocket.close(code=1008)
+        logger.info(
+            "rejected websocket quiz=%s user=%s error=%s",
+            quiz_id,
+            user_id,
+            exc.__class__.__name__,
+        )
+        await _send_quietly(websocket, _error_payload(exc))
+        await _close_quietly(websocket)
         return
 
-    await connection_manager.connect(quiz_id, user_id, websocket)
+    registered = False
     try:
+        await connection_manager.connect(quiz_id, user_id, websocket)
+        registered = True
         async with connection_manager.room_lock(quiz_id):
             leaderboard = quiz_service.leaderboard(quiz_id)
             await websocket.send_json(
@@ -52,14 +69,20 @@ async def quiz_socket(websocket: WebSocket, quiz_id: str, user_id: str) -> None:
                 }
             )
             await connection_manager.broadcast(quiz_id, _leaderboard_message(leaderboard))
+            logger.info("participant connected quiz=%s user=%s", quiz_id, user_id)
 
         while True:
             raw = await websocket.receive_text()
             await _handle_message(websocket, quiz_id, user_id, raw)
     except WebSocketDisconnect:
-        return
+        pass
+    except Exception:
+        logger.exception("websocket failed quiz=%s user=%s", quiz_id, user_id)
+        await _send_quietly(websocket, _SERVER_ERROR)
     finally:
-        await connection_manager.disconnect(quiz_id, user_id, websocket)
+        if registered:
+            await connection_manager.disconnect(quiz_id, user_id, websocket)
+            logger.info("participant disconnected quiz=%s user=%s", quiz_id, user_id)
 
 
 async def _handle_message(
@@ -74,6 +97,7 @@ async def _handle_message(
             raise ValueError("not an object")
         message = SubmitAnswerMessage.model_validate(payload)
     except (json.JSONDecodeError, ValueError, ValidationError):
+        logger.warning("invalid websocket message quiz=%s user=%s", quiz_id, user_id)
         await websocket.send_json(_INVALID_MESSAGE)
         return
 
@@ -88,17 +112,49 @@ async def _handle_message(
         except QuizError as exc:
             await websocket.send_json(_error_payload(exc, message.question_id))
             return
+        except Exception:
+            logger.exception(
+                "answer failed quiz=%s user=%s question=%s",
+                quiz_id,
+                user_id,
+                message.question_id,
+            )
+            await _send_quietly(websocket, _SERVER_ERROR)
+            return
 
+        logger.info(
+            "answer scored quiz=%s user=%s question=%s correct=%s score=%s",
+            quiz_id,
+            user_id,
+            message.question_id,
+            result.correct,
+            result.score,
+        )
         leaderboard = quiz_service.leaderboard(quiz_id)
-        await websocket.send_json(
+        await _send_quietly(
+            websocket,
             {
                 "type": "answer_result",
                 "question_id": message.question_id,
                 "correct": result.correct,
                 "score": result.score,
-            }
+            },
         )
         await connection_manager.broadcast(quiz_id, _leaderboard_message(leaderboard))
+
+
+async def _send_quietly(websocket: WebSocket, message: dict[str, object]) -> None:
+    try:
+        await websocket.send_json(message)
+    except Exception:
+        return
+
+
+async def _close_quietly(websocket: WebSocket) -> None:
+    try:
+        await websocket.close(code=1008)
+    except Exception:
+        return
 
 
 def _question_payload(question: Question) -> dict[str, object]:
